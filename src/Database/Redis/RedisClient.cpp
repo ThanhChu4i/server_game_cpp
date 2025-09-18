@@ -76,89 +76,8 @@ bool RedisClient::Connect()
     }
 }
 
-// ---------------- Sync implementations ----------------
-std::string RedisClient::get(const std::string &key)
-{
-    if (!redis_)
-        return {};
-    try
-    {
-        auto val = redis_->get(key);
-        return val ? *val : std::string();
-    }
-    catch (const sw::redis::Error &e)
-    {
-        std::cerr << "GET error: " << e.what() << std::endl;
-    }
-    return {};
-}
-
-bool RedisClient::set(const std::string &key, const std::string &value)
-{
-    if (!redis_)
-        return false;
-    try
-    {
-        redis_->set(key, value);
-        return true;
-    }
-    catch (const sw::redis::Error &e)
-    {
-        std::cerr << "SET error: " << e.what() << std::endl;
-    }
-    return false;
-}
-
-bool RedisClient::hset(const std::string &hash, const std::string &field, const std::string &value)
-{
-    if (!redis_)
-        return false;
-    try
-    {
-        redis_->hset(hash, field, value);
-        return true;
-    }
-    catch (const sw::redis::Error &e)
-    {
-        std::cerr << "HSET error: " << e.what() << std::endl;
-    }
-    return false;
-}
-
-std::string RedisClient::hget(const std::string &hash, const std::string &field)
-{
-    if (!redis_)
-        return {};
-    try
-    {
-        auto val = redis_->hget(hash, field);
-        return val ? *val : std::string();
-    }
-    catch (const sw::redis::Error &e)
-    {
-        std::cerr << "HGET error: " << e.what() << std::endl;
-    }
-    return {};
-}
-
-bool RedisClient::zadd(const std::string &key, const std::string &member, double score)
-{
-    if (!redis_)
-        return false;
-    try
-    {
-        redis_->zadd(key, member, score);
-        return true;
-    }
-    catch (const sw::redis::Error &e)
-    {
-        std::cerr << "ZADD error: " << e.what() << std::endl;
-    }
-    return false;
-}
-
 // ---------------- Async (callback) implementations ----------------
-void RedisClient::getAsync(const std::string &key, StringCallback cb)
+void RedisClient::get(const std::string &key, StringCallback cb)
 {
     auto redis_copy = redis_;
     if (!redis_copy)
@@ -180,7 +99,7 @@ void RedisClient::getAsync(const std::string &key, StringCallback cb)
         .detach();
 }
 
-void RedisClient::setAsync(const std::string &key, const std::string &value, BoolCallback cb)
+void RedisClient::set(const std::string &key, const std::string &value, BoolCallback cb)
 {
     auto redis_copy = redis_;
     if (!redis_copy)
@@ -202,7 +121,7 @@ void RedisClient::setAsync(const std::string &key, const std::string &value, Boo
         .detach();
 }
 
-void RedisClient::hsetAsync(const std::string &hash, const std::string &field, const std::string &value, BoolCallback cb)
+void RedisClient::hset(const std::string &hash, const std::string &field, const std::string &value, BoolCallback cb)
 {
     auto redis_copy = redis_;
     if (!redis_copy)
@@ -224,7 +143,7 @@ void RedisClient::hsetAsync(const std::string &hash, const std::string &field, c
         .detach();
 }
 
-void RedisClient::hgetAsync(const std::string &hash, const std::string &field, StringCallback cb)
+void RedisClient::hget(const std::string &hash, const std::string &field, StringCallback cb)
 {
     auto redis_copy = redis_;
     if (!redis_copy)
@@ -246,7 +165,7 @@ void RedisClient::hgetAsync(const std::string &hash, const std::string &field, S
         .detach();
 }
 
-void RedisClient::zaddAsync(const std::string &key, const std::string &member, double score, BoolCallback cb)
+void RedisClient::zadd(const std::string &key, const std::string &member, double score, BoolCallback cb)
 {
     auto redis_copy = redis_;
     if (!redis_copy)

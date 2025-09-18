@@ -92,31 +92,31 @@ void Init::initWhoAmI(RedisClient &redisClient)
                   << whoAmI.dump(4) << std::endl;
 
         // 3. Lưu vào Redis
-        redisClient.hsetAsync("manage:server_list", whoAmI["name"], whoAmI.dump(),
-                              [](bool ok)
-                              {
-                                  if (!ok)
-                                  {
-                                      std::cerr << "Failed to save server_list to Redis" << std::endl;
-                                  }
-                                  else
-                                  {
-                                      std::cout << "Server_list saved OK" << std::endl;
-                                  }
-                              });
+        redisClient.hset("manage:server_list", whoAmI["name"], whoAmI.dump(),
+                         [](bool ok)
+                         {
+                             if (!ok)
+                             {
+                                 std::cerr << "Failed to save server_list to Redis" << std::endl;
+                             }
+                             else
+                             {
+                                 std::cout << "Server_list saved OK" << std::endl;
+                             }
+                         });
         std::cout << "check async" << std::endl;
-        redisClient.hsetAsync("manage:user_online_by_server", whoAmI["name"], "0",
-                              [](bool ok)
-                              {
-                                  if (!ok)
-                                  {
-                                      std::cerr << "Failed to save user_online_by_server to Redis" << std::endl;
-                                  }
-                                  else
-                                  {
-                                      std::cout << "User_online_by_server saved OK" << std::endl;
-                                  }
-                              });
+        redisClient.hset("manage:user_online_by_server", whoAmI["name"], "0",
+                         [](bool ok)
+                         {
+                             if (!ok)
+                             {
+                                 std::cerr << "Failed to save user_online_by_server to Redis" << std::endl;
+                             }
+                             else
+                             {
+                                 std::cout << "User_online_by_server saved OK" << std::endl;
+                             }
+                         });
     }
     catch (const std::exception &e)
     {

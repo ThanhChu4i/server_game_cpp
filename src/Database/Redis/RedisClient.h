@@ -18,19 +18,19 @@ public:
     bool Connect();
 
     // Sync APIs
-    std::string get(const std::string &key);
-    bool set(const std::string &key, const std::string &value);
-    bool hset(const std::string &hash, const std::string &field, const std::string &value);
-    std::string hget(const std::string &hash, const std::string &field);
-    bool zadd(const std::string &key, const std::string &member, double score);
+    // std::string get(const std::string &key);
+    // bool set(const std::string &key, const std::string &value);
+    // bool hset(const std::string &hash, const std::string &field, const std::string &value);
+    // std::string hget(const std::string &hash, const std::string &field);
+    // bool zadd(const std::string &key, const std::string &member, double score);
 
     // Async (callback-style). Non-blocking, callback invoked when done.
     // NOTE: these schedule work on detached threads; callback runs on that worker thread.
-    void getAsync(const std::string &key, StringCallback cb);
-    void setAsync(const std::string &key, const std::string &value, BoolCallback cb);
-    void hsetAsync(const std::string &hash, const std::string &field, const std::string &value, BoolCallback cb);
-    void hgetAsync(const std::string &hash, const std::string &field, StringCallback cb);
-    void zaddAsync(const std::string &key, const std::string &member, double score, BoolCallback cb);
+    void get(const std::string &key, StringCallback cb);
+    void set(const std::string &key, const std::string &value, BoolCallback cb);
+    void hset(const std::string &hash, const std::string &field, const std::string &value, BoolCallback cb);
+    void hget(const std::string &hash, const std::string &field, StringCallback cb);
+    void zadd(const std::string &key, const std::string &member, double score, BoolCallback cb);
 
 private:
     bool LoadConfig(const std::string &path);

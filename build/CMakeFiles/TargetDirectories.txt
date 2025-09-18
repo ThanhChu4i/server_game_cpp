@@ -1,3 +1,0 @@
-/home/xgame/Desktop/Server_Game_CPP/build/CMakeFiles/server.dir
-/home/xgame/Desktop/Server_Game_CPP/build/CMakeFiles/edit_cache.dir
-/home/xgame/Desktop/Server_Game_CPP/build/CMakeFiles/rebuild_cache.dir
