@@ -2,10 +2,10 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 
-UserManager::UserManager(quicServer &server)
+userManager::userManager(quicServer &server)
     : server_(server) {}
 
-void UserManager::addUser(const User &user)
+void userManager::addUser(const User &user)
 {
     if (hasUser(user.playerId))
     {
@@ -14,12 +14,12 @@ void UserManager::addUser(const User &user)
     users_.emplace(user.playerId, user);
 }
 
-bool UserManager::hasUser(const std::string &playerId) const
+bool userManager::hasUser(const std::string &playerId) const
 {
     return users_.find(playerId) != users_.end();
 }
 
-void UserManager::removeUser(const std::string &playerId)
+void userManager::removeUser(const std::string &playerId)
 {
     auto it = users_.find(playerId);
     if (it == users_.end())
@@ -29,7 +29,7 @@ void UserManager::removeUser(const std::string &playerId)
     users_.erase(it);
 }
 
-void UserManager::sendMessageToUser(const std::string &playerId, const std::string &data)
+void userManager::sendMessageToUser(const std::string &playerId, const std::string &data)
 {
     auto it = users_.find(playerId);
     if (it == users_.end())
@@ -43,7 +43,7 @@ void UserManager::sendMessageToUser(const std::string &playerId, const std::stri
     }
 }
 
-User *UserManager::getUser(const std::string &playerId)
+User *userManager::getUser(const std::string &playerId)
 {
     auto it = users_.find(playerId);
     if (it == users_.end())
@@ -53,7 +53,7 @@ User *UserManager::getUser(const std::string &playerId)
     return &it->second;
 }
 
-void UserManager::broadcastToAll(const std::string &message)
+void userManager::broadcastToAll(const std::string &message)
 {
     for (const auto &[pid, user] : users_)
     {

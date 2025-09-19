@@ -10,7 +10,7 @@ using json = nlohmann::json;
 class userService
 {
 public:
-    explicit userService(RedisClient &redis, PostgresClient &pg);
+    explicit userService(redisClient &redis, postgresClient &pg);
 
     // Check user cache trong Redis
     boost::asio::awaitable<bool> isExists(const std::string &playerUUID);
@@ -19,8 +19,8 @@ public:
     boost::asio::awaitable<bool> updateRedisCache(const std::string &playerUUID, const json &data);
 
 private:
-    redisClient &redisClient;
-    postgresClient &pgClient;
+    redisClient &redis;
+    postgresClient &pg;
     static constexpr int CACHE_EXPIRE = 3600 * 4; // 4 giờ
 };
 

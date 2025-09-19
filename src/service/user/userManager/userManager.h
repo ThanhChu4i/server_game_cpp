@@ -11,10 +11,10 @@ struct User
     bool auth = false;
 };
 
-class UserManager
+class userManager
 {
 public:
-    explicit UserManager(quicServer &server);
+    explicit userManager(quicServer &server);
 
     void addUser(const User &user);
     bool hasUser(const std::string &playerId) const;

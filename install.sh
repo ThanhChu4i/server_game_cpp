@@ -3,9 +3,9 @@ sudo apt update
 sudo apt install libhiredis-dev -y
 sudo apt install libpq-dev -y
 
-# tao thu muc extern chua thu vien
-mkdir extern
-cd extern
+# tao thu muc include chua thu vien
+mkdir include
+cd include
 # cai msquic
 git clone https://github.com/microsoft/msquic.git
 cd msquic

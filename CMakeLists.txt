@@ -11,12 +11,12 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-fcoroutines)
 endif()
 # Đường dẫn msquic
-set(MSQUIC_DIR ${CMAKE_SOURCE_DIR}/extern/msquic)
+set(MSQUIC_DIR ${CMAKE_SOURCE_DIR}/include/msquic)
 include_directories(${MSQUIC_DIR}/src/inc)
 link_directories(${MSQUIC_DIR}/build/bin/Release)
 
-# Redis++ trong extern
-set(REDIS_PLUS_PLUS_DIR ${CMAKE_SOURCE_DIR}/extern/redis-plus-plus/build/install)
+# Redis++ trong include
+set(REDIS_PLUS_PLUS_DIR ${CMAKE_SOURCE_DIR}/include/redis-plus-plus/build/install)
 include_directories(${REDIS_PLUS_PLUS_DIR}/include)
 link_directories(${REDIS_PLUS_PLUS_DIR}/lib)
 
@@ -59,11 +59,11 @@ target_include_directories(server PRIVATE
 )
 
 # Include Redis++
-include_directories(${CMAKE_SOURCE_DIR}/extern/redis-plus-plus/build/install/include)
+include_directories(${CMAKE_SOURCE_DIR}/include/redis-plus-plus/build/install/include)
 include_directories(${CURL_INCLUDE_DIRS})
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${CMAKE_SOURCE_DIR}/src/Coroutine) #Task.h
-link_directories(${CMAKE_SOURCE_DIR}/extern/redis-plus-plus/build/install/lib)
+link_directories(${CMAKE_SOURCE_DIR}/include/redis-plus-plus/build/install/lib)
 
 target_link_libraries(server
     PRIVATE
@@ -74,7 +74,7 @@ target_link_libraries(server
     nlohmann_json::nlohmann_json
     msquic
     ssl
-    ${CMAKE_SOURCE_DIR}/extern/redis-plus-plus/build/libredis++.a                         # link trực tiếp tới libredis++.a hoặc .so
+    ${CMAKE_SOURCE_DIR}/include/redis-plus-plus/build/libredis++.a                         # link trực tiếp tới libredis++.a hoặc .so
     crypto
     pthread
     dl

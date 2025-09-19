@@ -35,6 +35,7 @@ public:
     // boost::asio::awaitable<std::vector<std::pair<std::string, double>>> zrangeWithScores(const std::string &key, long start, long stop);
     boost::asio::awaitable<long long> exists(const std::string &key);
     boost::asio::awaitable<void> expire(const std::string &key, const int &expire);
+    boost::asio::awaitable<void> hincrby(const std::string &key, const std::string &name, const int &number);
 
 private:
     std::string host_;

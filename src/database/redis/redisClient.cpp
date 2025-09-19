@@ -110,13 +110,12 @@ boost::asio::awaitable<void> redisClient::expire(const std::string &key, const i
                                  std::cerr << "[Redis] expire failed for key: " << key << std::endl;
                              } });
 }
-// boost::asio::awaitable<std::vector<std::pair<std::string, double>>> redisClient::zrangeWithScores(const std::string &key, long start, long stop)
-// {
-//     co_return co_await runBlockingWithResult<std::vector<std::pair<std::string, double>>>(
-//         [this, key, start, stop]()
-//         {
-//             std::vector<std::pair<std::string, double>> result;
-//             redis_->zrange(key, start, stop, std::back_inserter(result), true);
-//             return result;
-//         });
-// }
+boost::asio::awaitable<void> redisClient::hincrby(const std::string &key, const std::string &name, const int &number)
+{
+    co_await runBlocking([this, key, name, number]()
+                         {
+                             bool ok = redis_->hincrby(key, name, number); 
+                            if (!ok) {
+                                std::cerr << "[Redis] hincrby failed for key: " << key << std::endl;
+                        } });
+}
