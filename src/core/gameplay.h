@@ -1,57 +1,80 @@
 #pragma once
 
-#include <string>
-#include <vector>
 #include <map>
 #include <mutex>
+#include <thread>
 #include <atomic>
-#include "msquic.h" // For HQUIC
+#include <vector>
+#include "msquic.h"
+#include <nlohmann/json.hpp>
+#include "../quicServer/quicServer.h"
 
 struct Player
 {
-    int x, y;
+    int x{0}, y{0};
     std::string name;
-    HQUIC stream;
-    int score = 0;
+    HQUIC stream{nullptr};
+    int score{0};
 };
 
 struct Item
 {
-    int x, y;
     int id;
-    bool active = true;
+    int x, y;
+    bool active{true};
 };
 
 struct Bullet
 {
-    int x, y;
-    int dx, dy; // direction vector
     int id;
+    int x, y;
+    int dx, dy;
     std::string shooter_name;
-    bool active = true;
-    int speed = 5; // pixels per update
+    bool active{true};
+    int speed{5};
 };
 
-// Global game state variables
-extern std::map<HQUIC, Player> g_Players;
-extern std::mutex g_PlayersMutex;
+class Gameplay
+{
+public:
+    explicit Gameplay(quicServer &server);
+    ~Gameplay();
 
-extern std::vector<Item> g_Items;
-extern std::mutex g_ItemsMutex;
-extern int g_NextItemId;
+    // Called from QUIC callbacks via posted tasks (so thread-safety still needed)
+    void handleMessage(HQUIC stream, const std::string &msg);
+    void handlePlayerConnected(HQUIC conn, HQUIC stream);
+    void handlePlayerDisconnected(HQUIC stream);
 
-extern std::vector<Bullet> g_Bullets;
-extern std::mutex g_BulletsMutex;
-extern int g_NextBulletId;
+    void startGameLoop();
+    void stopGameLoop();
 
-extern int g_NextPlayerId;
+private:
+    quicServer &quic_server_;
 
-// Game logic functions
-void AddPlayer(HQUIC stream, const std::string &name);
-void RemovePlayer(HQUIC stream);
-void BroadcastGameState();
-void HandlePlayerMove(HQUIC stream, int newX, int newY);
-void HandlePlayerShoot(const std::string &shooterName, int x, int y, int dx, int dy);
+    // game state
+    std::map<HQUIC, Player> players_;
+    std::mutex players_mutex_;
 
-// Game loop function
-void BroadcastLoop();
+    std::vector<Item> items_;
+    std::mutex items_mutex_;
+    int nextItemId_{1};
+
+    std::vector<Bullet> bullets_;
+    std::mutex bullets_mutex_;
+    int nextBulletId_{1};
+
+    std::atomic<bool> gameRunning_{false};
+    std::thread gameThread_;
+
+    // internal helpers
+    void gameLoop();
+    void broadcastGameState();
+    void addPlayer(HQUIC stream, const std::string &name);
+    void removePlayer(HQUIC stream);
+    void spawnItem();
+    void checkItemCollection();
+    void createBullet(const std::string &shooterName, int x, int y, int dx, int dy);
+    void updateBullets();
+    void checkBulletCollisions();
+    void sendWelcomeMessage(HQUIC stream, const std::string &playerName);
+};

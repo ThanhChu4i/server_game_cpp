@@ -1,43 +1,53 @@
 #pragma once
-#include <boost/asio.hpp>
+#include <msquic.h>
 #include <string>
 #include <unordered_map>
-#include "msquic.h"
-
-struct Client
-{
-    HQUIC Connection{nullptr};
-    HQUIC Stream{nullptr};
-};
+#include <mutex>
+#include <functional>
+#include <boost/asio.hpp>
 
 class quicServer
 {
 public:
-    quicServer(const std::string &certFile, const std::string &keyFile, boost::asio::io_context &io);
+    quicServer(const std::string &certPath, const std::string &keyPath, boost::asio::io_context &io);
     ~quicServer();
 
     bool start(uint16_t port);
     void stop();
-    bool sendMessage(uint64_t connId, const std::string &msg);
+    bool sendMessage(HQUIC stream, const std::string &msg);
 
     // Callbacks
-    std::function<void(uint64_t)> OnClientConnected;
-    std::function<void(uint64_t)> OnClientDisconnected;
-    std::function<void(uint64_t, const std::string &)> OnMessageReceived;
+    std::function<void(HQUIC, HQUIC)> onClientConnected;
+    std::function<void(HQUIC)> onClientDisconnected;
+    std::function<void(HQUIC, const std::string &)> onMessageReceived;
+    std::function<void(HQUIC, HQUIC)> onStreamStarted;
 
 private:
-    std::string CertFile, KeyFile;
-    boost::asio::io_context &io_context_;
+    std::string certFile_;
+    std::string keyFile_;
+    boost::asio::io_context &io_;
 
-    const QUIC_API_TABLE *MsQuic{nullptr}; // bảng API MsQuic
-    HQUIC Registration{nullptr};
-    HQUIC Listener{nullptr};
-    HQUIC Configuration{nullptr};
+    std::mutex clients_mutex_;
+    struct ClientCtx
+    {
+        HQUIC Connection = nullptr;
+        HQUIC Stream = nullptr;
+    };
+    std::unordered_map<HQUIC, ClientCtx> clients_;
 
-    uint64_t NextConnId{1};
-    std::unordered_map<uint64_t, Client> Clients;
+    std::mutex recv_buffers_mutex_;
+    std::unordered_map<HQUIC, std::string> recv_buffers_;
 
-    static QUIC_STATUS QUIC_API listenerCallback(HQUIC, void *ctx, QUIC_LISTENER_EVENT *evt);
-    static QUIC_STATUS QUIC_API connectionCallback(HQUIC conn, void *ctx, QUIC_CONNECTION_EVENT *evt);
-    static QUIC_STATUS QUIC_API streamCallback(HQUIC stream, void *ctx, QUIC_STREAM_EVENT *evt);
+    std::string &recvBufferForStream(HQUIC stream);
+    void handleSendComplete(void *client_context);
+
+    // MsQuic handles
+    const QUIC_API_TABLE *MsQuic = nullptr;
+    HQUIC Registration = nullptr;
+    HQUIC Configuration = nullptr;
+    HQUIC Listener = nullptr;
+
+    static QUIC_STATUS QUIC_API listenerCallback(HQUIC, void *, QUIC_LISTENER_EVENT *);
+    static QUIC_STATUS QUIC_API connectionCallback(HQUIC, void *, QUIC_CONNECTION_EVENT *);
+    static QUIC_STATUS QUIC_API streamCallback(HQUIC, void *, QUIC_STREAM_EVENT *);
 };
