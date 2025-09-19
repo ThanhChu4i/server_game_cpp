@@ -81,6 +81,7 @@
     "bitset": "cpp",
     "cfenv": "cpp",
     "regex": "cpp",
-    "stdfloat": "cpp"
+    "stdfloat": "cpp",
+    "*.inc": "cpp"
   }
 }

@@ -1,6 +1,6 @@
 #pragma once
-#include "ClientContext.h"
-#include "MessageDispatcher.h"
+#include "clientContext.h"
+#include "messageDispatcher.h"
 #include <nlohmann/json.hpp>
 #include <functional>
 

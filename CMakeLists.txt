@@ -22,18 +22,18 @@ link_directories(${REDIS_PLUS_PLUS_DIR}/lib)
 
 add_executable(server
     src/server.cpp
-    src/QuicServer/QuicServer.cpp
+    src/quicServer/quicServer.cpp
     src/AsioService/AsioService.cpp
-    src/Database/Postgres/PostgresClient.cpp
-    src/Database/Redis/RedisClient.cpp
-    src/Init/Init.cpp
+    src/database/postgres/postgresClient.cpp
+    src/database/redis/redisClient.cpp
+    src/init/init.cpp
 )
 
 # Copy config
-file(COPY ${CMAKE_SOURCE_DIR}/src/Database/Postgres/config.json
-     DESTINATION ${CMAKE_BINARY_DIR}/Database/Postgres)
-file(COPY ${CMAKE_SOURCE_DIR}/src/Database/Redis/config.json
-     DESTINATION ${CMAKE_BINARY_DIR}/Database/Redis)
+file(COPY ${CMAKE_SOURCE_DIR}/src/database/postgres/config.json
+     DESTINATION ${CMAKE_BINARY_DIR}/database/postgres)
+file(COPY ${CMAKE_SOURCE_DIR}/src/database/redis/config.json
+     DESTINATION ${CMAKE_BINARY_DIR}/database/redis)
 
 # System Hiredis
 find_path(HIREDIS_INCLUDE hiredis/hiredis.h)
