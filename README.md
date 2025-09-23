@@ -32,3 +32,12 @@ sudo apt install libboost-all-dev -y
 # Standalone Asio:
 
 sudo apt install libasio-dev -y
+
+# debug
+
+cd build
+sudo cmake -DCMAKE_BUILD_TYPE=Debug ..
+sudo make -j$(nproc)
+gdb ./server
+run 
+y

@@ -9,46 +9,55 @@
 using namespace boost::asio;
 using namespace boost::asio::ip;
 
-/// @brief Chứa logic chính để khởi tạo và chạy server game.
-/// @param io Đối tượng io_context của Boost.Asio.
-/// @return Một awaitable coroutine.
+/// @brief Chạy server game
 boost::asio::awaitable<void> runGameServer(io_context &io)
 {
     std::cout << "Starting server..." << std::endl;
 
-    // 1. Khởi tạo các thư viện toàn cục
+    // 1️⃣ Khởi tạo libcurl
     curl_global_init(CURL_GLOBAL_DEFAULT);
 
-    // 2. Khởi tạo cơ sở dữ liệu
+    // 2️⃣ Khởi tạo cơ sở dữ liệu
     init dbInitializer;
     if (!dbInitializer.Load())
     {
         std::cerr << "Failed to initialize Postgres or Redis." << std::endl;
-        curl_global_cleanup(); // Dọn dẹp tài nguyên
+        curl_global_cleanup();
         co_return;
     }
 
-    // 3. Khởi tạo các đối tượng chính
+    // 3️⃣ Tạo server và gameplay
     auto server = std::make_unique<quicServer>("../certs/server.crt", "../certs/server.key", io);
-    auto gameLogic = std::make_unique<Gameplay>(*server);
+    auto gameLogic = std::make_unique<Gameplay>(*server, io);
 
-    // 4. Gắn các callbacks của server
-    server->onMessageReceived = [&gameLogic](HQUIC stream, const std::string &msg)
+    // 4️⃣ Gắn callbacks, post vào io_context để thread-safe
+    server->onMessageReceived = [gameLogic_ptr = gameLogic.get(), &io](HQUIC stream, const std::string &msg)
     {
-        gameLogic->handleMessage(stream, msg);
+        // log message raw nhận được
+        std::cout << "[Server] Received raw msg: " << msg << std::endl;
+
+        // đẩy sang io_context để xử lý
+        boost::asio::post(io, [gameLogic_ptr, stream, msg]()
+                          {
+        if (gameLogic_ptr) 
+            gameLogic_ptr->handleMessage(stream, msg); });
     };
 
-    server->onStreamStarted = [&gameLogic](HQUIC conn, HQUIC stream)
+    server->onStreamStarted = [gameLogic_ptr = gameLogic.get(), &io](HQUIC conn, HQUIC stream)
     {
-        gameLogic->handlePlayerConnected(conn, stream);
+        boost::asio::post(io, [gameLogic_ptr, conn, stream]()
+                          {
+            if (gameLogic_ptr) gameLogic_ptr->handlePlayerConnected(conn, stream); });
     };
 
-    server->onClientDisconnected = [&gameLogic](HQUIC stream)
+    server->onClientDisconnected = [gameLogic_ptr = gameLogic.get(), &io](HQUIC stream)
     {
-        gameLogic->handlePlayerDisconnected(stream);
+        boost::asio::post(io, [gameLogic_ptr, stream]()
+                          {
+            if (gameLogic_ptr) gameLogic_ptr->handlePlayerDisconnected(stream); });
     };
 
-    // 5. Bắt đầu server và game loop
+    // 5️⃣ Bắt đầu server
     if (!server->start(4443))
     {
         std::cerr << "Server start failed." << std::endl;
@@ -57,15 +66,24 @@ boost::asio::awaitable<void> runGameServer(io_context &io)
     }
 
     gameLogic->startGameLoop();
-
     std::cout << "Server is running. Press Enter to stop..." << std::endl;
 
-    // 6. Chờ tín hiệu dừng từ người dùng
+    // 6️⃣ Signal handler Ctrl+C
+    signal_set signals(io, SIGINT, SIGTERM);
+    signals.async_wait([&](auto, auto)
+                       {
+        std::cout << "Signal received. Stopping server..." << std::endl;
+        gameLogic->stopGameLoop();
+        server->stop();
+        curl_global_cleanup();
+        io.stop(); });
+
+    // 7️⃣ Chờ Enter
     posix::stream_descriptor input(io, ::dup(STDIN_FILENO));
     std::string buffer;
-    co_await async_read(input, dynamic_buffer(buffer), use_awaitable);
+    co_await async_read_until(input, dynamic_buffer(buffer), '\n', use_awaitable);
 
-    // 7. Dừng và dọn dẹp tài nguyên
+    // 8️⃣ Dừng server khi nhấn Enter
     std::cout << "Stopping server..." << std::endl;
     gameLogic->stopGameLoop();
     server->stop();
@@ -74,14 +92,14 @@ boost::asio::awaitable<void> runGameServer(io_context &io)
     std::cout << "Server stopped. All resources cleaned up. :)" << std::endl;
 }
 
-//---
+// ---
 int main()
 {
     io_context io;
 
-    // Spawn coroutine runServer
+    // Spawn coroutine runGameServer
     co_spawn(io, runGameServer(io), detached);
 
-    io.run(); // chạy event loop
+    io.run(); // Chạy event loop
     return 0;
 }

@@ -1,27 +1,27 @@
 #include "gameplay.h"
-#include <iostream>
 #include <cstdlib>
 #include <ctime>
-#include <cmath>
-
+#include <algorithm>
+#include "../quicServer/quicServer.h"
 using json = nlohmann::json;
 
-Gameplay::Gameplay(quicServer &server) : quic_server_(server)
+Gameplay::Gameplay(quicServer &server, boost::asio::io_context &io)
+    : quic_server_(server), gameLoopTimer_(io)
 {
     srand(static_cast<unsigned int>(time(nullptr)));
+    lastItemSpawn_ = std::chrono::steady_clock::now();
 }
 
 Gameplay::~Gameplay()
 {
     stopGameLoop();
-    if (gameThread_.joinable())
-        gameThread_.join();
 }
 
 void Gameplay::handleMessage(HQUIC stream, const std::string &msg)
 {
     try
     {
+        std::cout << "[handleMessage] Received raw message:" << msg << std::endl;
         auto j = json::parse(msg);
         std::string action = j.value("action", "");
 
@@ -49,11 +49,11 @@ void Gameplay::handleMessage(HQUIC stream, const std::string &msg)
         {
             int x = j.value("x", -1);
             int y = j.value("y", -1);
-            int dx = j.value("dx", 0);
-            int dy = j.value("dy", 0);
+            double dx = j.value("dx", 0.0);
+            double dy = j.value("dy", 0.0);
             std::string shooterName = j.value("player", "");
 
-            if (x >= 0 && y >= 0 && (dx != 0 || dy != 0) && !shooterName.empty())
+            if (x >= 0 && y >= 0 && (dx != 0.0 || dy != 0.0) && !shooterName.empty())
             {
                 createBullet(shooterName, x, y, dx, dy);
             }
@@ -68,7 +68,7 @@ void Gameplay::handleMessage(HQUIC stream, const std::string &msg)
 void Gameplay::handlePlayerConnected(HQUIC /*conn*/, HQUIC stream)
 {
     std::cout << "[Gameplay] Player stream started: " << stream << "\n";
-    // Wait for client to send "join" message to actually add user
+    // Đợi client gửi tin nhắn "join" để thêm người chơi
 }
 
 void Gameplay::handlePlayerDisconnected(HQUIC stream)
@@ -79,44 +79,43 @@ void Gameplay::handlePlayerDisconnected(HQUIC stream)
 
 void Gameplay::startGameLoop()
 {
-    bool expected = false;
-    if (gameRunning_.compare_exchange_strong(expected, true))
-    {
-        gameThread_ = std::thread(&Gameplay::gameLoop, this);
-    }
+    gameRunning_ = true;
+    gameLoop(boost::system::error_code()); // Bắt đầu vòng lặp đầu tiên
 }
 
 void Gameplay::stopGameLoop()
 {
-    gameRunning_.store(false);
-    if (gameThread_.joinable())
-    {
-        gameThread_.join();
-    }
+    gameRunning_ = false;
+    gameLoopTimer_.cancel();
 }
 
-void Gameplay::gameLoop()
+void Gameplay::gameLoop(const boost::system::error_code &error)
 {
-    auto lastItemSpawn = std::chrono::steady_clock::now();
-    const auto itemSpawnInterval = std::chrono::seconds(5);
+    auto now = std::chrono::steady_clock::now();
 
-    while (gameRunning_.load())
+    if (error == boost::asio::error::operation_aborted)
+        return;
+
+    if (!gameRunning_)
+        return;
+
+    // Logic game
+    checkItemCollection();
+    updateBullets();
+    checkBulletCollisions();
+
+    if (now - lastItemSpawn_ >= std::chrono::seconds(5))
     {
-        auto now = std::chrono::steady_clock::now();
-
-        checkItemCollection();
-        updateBullets();
-        checkBulletCollisions();
-
-        if (now - lastItemSpawn >= itemSpawnInterval)
-        {
-            spawnItem();
-            lastItemSpawn = now;
-        }
-
-        broadcastGameState();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        spawnItem();
+        lastItemSpawn_ = now;
     }
+
+    broadcastGameState();
+
+    // Hẹn giờ lặp tiếp
+    gameLoopTimer_.expires_at(gameLoopTimer_.expiry() + std::chrono::milliseconds(50));
+    gameLoopTimer_.async_wait([this](const boost::system::error_code &e)
+                              { gameLoop(e); });
 }
 
 void Gameplay::broadcastGameState()
@@ -139,43 +138,40 @@ void Gameplay::broadcastGameState()
     std::vector<Item> itemSnapshot;
     {
         std::lock_guard<std::mutex> lock(items_mutex_);
-        for (auto &it : items_)
-            if (it.active)
-                itemSnapshot.push_back(it);
+        items_.erase(std::remove_if(items_.begin(), items_.end(), [](const Item &it)
+                                    { return !it.active; }),
+                     items_.end());
+        itemSnapshot = items_;
     }
 
     std::vector<Bullet> bulletSnapshot;
     {
         std::lock_guard<std::mutex> lock(bullets_mutex_);
-        for (auto &b : bullets_)
-            if (b.active)
-                bulletSnapshot.push_back(b);
+        bullets_.erase(std::remove_if(bullets_.begin(), bullets_.end(), [](const Bullet &b)
+                                      { return !b.active; }),
+                       bullets_.end());
+        bulletSnapshot = bullets_;
     }
 
+    // Gửi dữ liệu trạng thái
     json state_json = json::object();
     state_json["players"] = json::array();
-    for (auto &p : playerSnapshot)
+    for (const auto &p : playerSnapshot)
         state_json["players"].push_back({{"name", p.name}, {"x", p.x}, {"y", p.y}, {"score", p.score}});
 
     state_json["items"] = json::array();
-    for (auto &it : itemSnapshot)
+    for (const auto &it : itemSnapshot)
         state_json["items"].push_back({{"id", it.id}, {"x", it.x}, {"y", it.y}});
 
     state_json["bullets"] = json::array();
-    for (auto &b : bulletSnapshot)
+    for (const auto &b : bulletSnapshot)
         state_json["bullets"].push_back({{"id", b.id}, {"x", b.x}, {"y", b.y}, {"dx", b.dx}, {"dy", b.dy}, {"shooter", b.shooter_name}});
 
     std::string msg = state_json.dump() + "\n";
 
-    // Send to streams, but verify stream still exists in server's Clients map to avoid race.
     for (auto &stream : playerStreams)
     {
-        // naive check: sendMessage returns false if it fails (e.g. closed)
-        if (!quic_server_.sendMessage(stream, msg))
-        {
-            // optionally remove player if send fails
-            removePlayer(stream);
-        }
+        quic_server_.sendMessage(stream, msg);
     }
 }
 
@@ -265,7 +261,7 @@ void Gameplay::updateBullets()
             continue;
         b.x += b.dx * b.speed;
         b.y += b.dy * b.speed;
-        if (b.x < 0 || b.x > 2000 || b.y < 0 || b.y > 2000) // larger bounds
+        if (b.x < 0 || b.x > 2000 || b.y < 0 || b.y > 2000)
             b.active = false;
     }
 }
@@ -299,6 +295,12 @@ void Gameplay::checkBulletCollisions()
 
 void Gameplay::sendWelcomeMessage(HQUIC stream, const std::string &playerName)
 {
-    std::string msg = "WELCOME:" + playerName + "\n";
-    quic_server_.sendMessage(stream, msg);
+    {
+        nlohmann::json j;
+        j["action"] = "welcome";
+        j["player"] = playerName;
+
+        std::string msg = j.dump() + "\n"; // ensure newline separator
+        quic_server_.sendMessage(stream, msg);
+    }
 }
